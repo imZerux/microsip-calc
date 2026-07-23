@@ -153,7 +153,7 @@ jobs:
         # Try to build using solution file first
         if (Test-Path "pjproject.sln") {
             Write-Host "Building using solution file..."
-            & $msbuild "pjproject.sln" /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /m
+            & $msbuild "pjproject.sln" /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /m
         } else {
             # Build individual projects
             Write-Host "Building individual projects..."
@@ -170,7 +170,7 @@ jobs:
             foreach ($proj in $projects) {
                 if (Test-Path $proj) {
                     Write-Host "Building $proj..."
-                    & $msbuild $proj /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /m
+                    & $msbuild $proj /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /m
                     if ($LASTEXITCODE -ne 0) {
                         Write-Host "Warning: Build of $proj may have issues, continuing..."
                     }
@@ -227,6 +227,7 @@ jobs:
             /p:Configuration=${{env.BUILD_CONFIGURATION}} `
             /p:Platform=${{env.BUILD_PLATFORM}} `
             /p:PlatformToolset=v143 `
+            /p:WindowsTargetPlatformVersion=10.0 `
             /m
 
         if ($LASTEXITCODE -ne 0) {
