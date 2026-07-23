@@ -188,29 +188,26 @@ jobs:
         Set-Location "${{ github.workspace }}"
         Set-Location ".."
 
-        Write-Host "Copying PJSIP libraries..."
+        Write-Host "Staging PJSIP headers + libs where MicroSIP expects them (..\pjX\include, ..\lib)..."
 
-        # Copy built libraries to expected locations
-        $libSource = "pjproject"
-        $libDest = "lib"
+        $src = "pjproject"
 
-        if (Test-Path $libSource) {
-            # Copy all .lib files from pjproject
-            Get-ChildItem -Path "$libSource\lib\*.lib" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-                Write-Host "Copying $($_.Name) to lib/"
-                Copy-Item $_.FullName -Destination "$libDest/" -Force -ErrorAction SilentlyContinue
-            }
-
-            # Also copy third_party libs
-            Get-ChildItem -Path "$libSource\third_party\lib\*.lib" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-                Write-Host "Copying third_party lib: $($_.Name)"
-                Copy-Item $_.FullName -Destination "$libDest/" -Force -ErrorAction SilentlyContinue
+        # 1) Copy PJSIP subtrees up one level so ..\pjlib\include, ..\pjsip\include, etc. resolve
+        foreach ($d in @("pjlib","pjlib-util","pjnath","pjmedia","pjsip","third_party")) {
+            if (Test-Path "$src\$d") {
+                Copy-Item "$src\$d" -Destination "." -Recurse -Force
+                Write-Host "  staged $d"
             }
         }
 
-        # List what we have
+        # 2) Gather every built .lib into .\lib
+        New-Item -ItemType Directory -Force -Path "lib" | Out-Null
+        Get-ChildItem -Path "$src" -Recurse -Filter *.lib -ErrorAction SilentlyContinue | ForEach-Object {
+            Copy-Item $_.FullName -Destination "lib\" -Force -ErrorAction SilentlyContinue
+        }
+
         Write-Host "Libraries in lib/:"
-        Get-ChildItem -Path "$libDest/*.lib" -ErrorAction SilentlyContinue | ForEach-Object {
+        Get-ChildItem -Path "lib\*.lib" -ErrorAction SilentlyContinue | ForEach-Object {
             Write-Host "  $($_.Name)"
         }
 
