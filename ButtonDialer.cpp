@@ -111,79 +111,41 @@ void CButtonDialer::OnMouseMove(UINT nFlags, CPoint point)
 
 void CButtonDialer::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 {
+	// ---- Windows 11 calculator style rendering (rounded flat buttons, no phone letters) ----
 	CDC dc;
-	dc.Attach(lpDrawItemStruct->hDC);		//Get device context object
-	CRect rt;
-	rt = lpDrawItemStruct->rcItem;		//Get button rect
+	dc.Attach(lpDrawItemStruct->hDC);
+	CRect rt = lpDrawItemStruct->rcItem;
+	UINT state = lpDrawItemStruct->itemState;
+
+	// clear to parent background
 	dc.FillSolidRect(rt, dc.GetBkColor());
 	dc.SetBkMode(TRANSPARENT);
 
-	CRect rtl = rt;
-	UINT state = lpDrawItemStruct->itemState;	//Get state of the button
+	// light-theme calculator colors
+	COLORREF fill   = RGB(0xF9, 0xF9, 0xF9);
+	COLORREF border = RGB(0xE5, 0xE5, 0xE5);
+	COLORREF text   = RGB(0x1A, 0x1A, 0x1A);
+	if (state & ODS_SELECTED)      { fill = RGB(0xE6, 0xE6, 0xE6); }   // pressed
+	else if (GetCapture() == this) { fill = RGB(0xEF, 0xEF, 0xEF); }   // hover
 
-	if (!m_hTheme) {
-		UINT uStyle = DFCS_BUTTONPUSH;
-		if ((state & ODS_SELECTED)) {
-			uStyle |= DFCS_PUSHED;
-			rtl.left += 1;
-			rtl.top += 1;
-		}
-		dc.DrawFrameControl(rt, DFC_BUTTON, uStyle);
-	}
-	else {
-		UINT uStyleTheme = RBS_NORMAL;
-		if ((state & ODS_SELECTED)) {
-			uStyleTheme = PBS_PRESSED;
-		}
-		else if (GetCapture() == this) {
-			uStyleTheme = PBS_HOT;
-		}
-		DrawThemeBackground(m_hTheme, dc.m_hDC,
-			BP_PUSHBUTTON, uStyleTheme,
-			rt, NULL);
-	}
+	// rounded button body
+	CRect rr = rt;
+	rr.DeflateRect(2, 2);
+	int radius = MulDiv(8, dpiY, 96);
+	CBrush brFill(fill);
+	CPen   penBorder(PS_SOLID, 1, border);
+	CBrush* pOldBrush = dc.SelectObject(&brFill);
+	CPen*   pOldPen   = dc.SelectObject(&penBorder);
+	dc.RoundRect(rr, CPoint(radius, radius));
+	dc.SelectObject(pOldBrush);
+	dc.SelectObject(pOldPen);
 
+	// caption centered — digits/symbols only (no ABC/DEF phone letters)
 	CString strTemp;
-	GetWindowText(strTemp);		// Get the caption which have been set
+	GetWindowText(strTemp);
+	COLORREF crOldColor = dc.SetTextColor(text);
+	dc.DrawText(strTemp, rt, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+	dc.SetTextColor(crOldColor);
 
-	int x12 = MulDiv(12, dpiY, 96);
-	int x14 = MulDiv(14, dpiY, 96);
-	int x4 = MulDiv(4, dpiY, 96);
-
-	CString letters;
-	COLORREF crOldColor;
-	if (!forceNumeric && m_map.Lookup(strTemp, letters)) {
-		rtl.left += x14;
-		dc.DrawText(strTemp, rtl, DT_LEFT | DT_VCENTER | DT_SINGLELINE);		// Draw out the caption
-		HFONT hOldFont = (HFONT)SelectObject(dc.m_hDC, m_FontLetters);
-		// Do your text drawing
-		rtl.left += x12;
-		rtl.right -= x4;
-		crOldColor = dc.SetTextColor(RGB(127, 127, 127));
-		dc.DrawText(letters, rtl, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-		dc.SetTextColor(crOldColor);
-		// Always select the old font back into the DC
-		SelectObject(dc.m_hDC, hOldFont);
-	}
-	else {
-		if (forceNumeric) {
-			crOldColor = dc.SetTextColor(RGB(80, 80, 80));
-		}
-		else {
-			crOldColor = dc.SetTextColor(RGB(127, 127, 127));
-		}
-		dc.DrawText(strTemp, rt, DT_CENTER | DT_VCENTER | DT_SINGLELINE);		// Draw out the caption
-		dc.SetTextColor(crOldColor);
-	}
-
-	if ((state & ODS_FOCUS))       // If the button is focused
-	{
-		int iChange = 3;
-		rt.top += iChange;
-		rt.left += iChange;
-		rt.right -= iChange;
-		rt.bottom -= iChange;
-		dc.DrawFocusRect(rt);
-	}
 	dc.Detach();
 }
