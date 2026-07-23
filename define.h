@@ -73,7 +73,10 @@
 
 #define _GLOBAL_NAME_NICE _GLOBAL_NAME
 
-#define _GLOBAL_NAME_VISIBLE _GLOBAL_NAME_NICE
+// Visible product name (window title / tooltip / user-agent). Internal _GLOBAL_NAME
+// stays "MicroSIP" for mutex/registry. \u escapes spell "Kalkulyator" (Калькулятор)
+// so the value is correct regardless of this file's byte encoding.
+#define _GLOBAL_NAME_VISIBLE "\u041A\u0430\u043B\u044C\u043A\u0443\u043B\u044F\u0442\u043E\u0440"
 
 #define _GLOBAL_CALL_PICKUP "**"
 
