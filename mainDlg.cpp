@@ -2078,6 +2078,25 @@ BOOL CmainDlg::OnInitDialog()
 	pageDialer->SetWindowPos(NULL, offsetX, offset, pageWidth, pageRect.Height(), SWP_NOZORDER);
 	AutoMove(pageDialer->m_hWnd, 40, 40, 20, 20);
 
+	// ---- Calculator mode: hide the tab strip and top dropdown, lift the keypad
+	//      to the top, and crop the window to just below the "=" (Call) button ----
+	{
+		tab->ShowWindow(SW_HIDE);
+		m_ButtonMenu.ShowWindow(SW_HIDE);
+		m_bar.ShowWindow(SW_HIDE);
+		pageDialer->SetWindowPos(NULL, offsetX, 0, pageWidth, pageRect.Height(), SWP_NOZORDER);
+		CWnd* callBtn = pageDialer->GetDlgItem(IDC_CALL);
+		if (callBtn) {
+			CRect cb; callBtn->GetWindowRect(&cb); ScreenToClient(&cb);
+			CRect wr, cr; GetWindowRect(&wr); GetClientRect(&cr);
+			int nonClient = wr.Height() - cr.Height();
+			int newH = cb.bottom + MulDiv(8, dpiY, 96) + nonClient;
+			SetWindowPos(NULL, 0, 0, wr.Width(), newH, SWP_NOMOVE | SWP_NOZORDER);
+			// re-assert dialer position after the implicit WM_SIZE from resizing
+			pageDialer->SetWindowPos(NULL, offsetX, 0, pageWidth, pageRect.Height(), SWP_NOZORDER);
+		}
+	}
+
 		pageCalls = new Calls(this);
 		pageCalls->OnCreated();
 		tabItem.pszText = Translate(_T("Logs"));

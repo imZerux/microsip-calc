@@ -448,6 +448,23 @@ BOOL Dialer::OnInitDialog()
 	AutoMove(IDC_DIALER_VOICEMAIL, 100, 100, 0, 0);
 	AutoMove(IDC_DIALER_VOICEMAIL_DISABLED, 100, 100, 0, 0);
 
+	// ---- Calculator mode: hide all softphone chrome (volume sliders, mute,
+	//      DND/AA/CONF/REC/FWD, video-call & message icons, DTMF "Send") ----
+	{
+		int hideIds[] = {
+			IDC_VOLUME_INPUT, IDC_VOLUME_OUTPUT,
+			IDC_BUTTON_MUTE_INPUT, IDC_BUTTON_MUTE_OUTPUT,
+			IDC_BUTTON_MINUS_INPUT, IDC_BUTTON_MINUS_OUTPUT,
+			IDC_BUTTON_PLUS_INPUT, IDC_BUTTON_PLUS_OUTPUT,
+			IDC_VIDEO_CALL, IDC_MESSAGE, IDC_DIALER_DTMF,
+			IDC_DIALER_DND, IDC_DIALER_AA, IDC_DIALER_CONF, IDC_DIALER_REC, IDC_DIALER_FWD
+		};
+		for (int i = 0; i < (int)(sizeof(hideIds) / sizeof(hideIds[0])); i++) {
+			CWnd* w = GetDlgItem(hideIds[i]);
+			if (w) w->ShowWindow(SW_HIDE);
+		}
+	}
+
 	DialedLoad();
 
 	//--
