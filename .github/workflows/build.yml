@@ -150,34 +150,17 @@ jobs:
         # Build PJSIP using MSBuild with solution file
         $msbuild = "msbuild"   # from PATH via microsoft/setup-msbuild
 
-        # Try to build using solution file first
-        if (Test-Path "pjproject.sln") {
-            Write-Host "Building using solution file..."
-            & $msbuild "pjproject.sln" /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /m
-        } else {
-            # Build individual projects
-            Write-Host "Building individual projects..."
-            $projects = @(
-                "pjlib/build/pjlib.vcxproj",
-                "pjlib-util/build/pjlib-util.vcxproj",
-                "pjnath/build/pjnath.vcxproj",
-                "pjmedia/build/pjmedia.vcxproj",
-                "pjsip/build/pjsip.vcxproj",
-                "pjsip/build/pjsip_simple.vcxproj",
-                "pjsip/build/pjsua_lib.vcxproj"
-            )
-
-            foreach ($proj in $projects) {
-                if (Test-Path $proj) {
-                    Write-Host "Building $proj..."
-                    & $msbuild $proj /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /m
-                    if ($LASTEXITCODE -ne 0) {
-                        Write-Host "Warning: Build of $proj may have issues, continuing..."
-                    }
-                } else {
-                    Write-Host "Project file not found: $proj"
-                }
-            }
+        # pjproject 2.15.1 solution is named pjproject-vs14.sln.
+        # Build the pjsua_lib target: it pulls in every library dependency
+        # (pjlib, pjlib-util, pjnath, pjmedia, pjmedia-codec, pjsip*, third_party)
+        # WITHOUT building the sample apps that could otherwise fail the build.
+        $sln = Get-ChildItem -Filter "pjproject-vs14.sln" | Select-Object -First 1
+        if (-not $sln) { $sln = Get-ChildItem -Filter "*.sln" | Select-Object -First 1 }
+        Write-Host "Building solution: $($sln.Name)"
+        & $msbuild $sln.FullName /t:pjsua_lib /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /m
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "pjsua_lib target failed (exit $LASTEXITCODE)"
+            exit 1
         }
 
         Write-Host "PJSIP build completed"
@@ -204,6 +187,21 @@ jobs:
         New-Item -ItemType Directory -Force -Path "lib" | Out-Null
         Get-ChildItem -Path "$src" -Recurse -Filter *.lib -ErrorAction SilentlyContinue | ForEach-Object {
             Copy-Item $_.FullName -Destination "lib\" -Force -ErrorAction SilentlyContinue
+        }
+
+        # 3) Merge all pj + third_party libs into the single combined static lib
+        #    that MicroSIP links via #pragma comment(lib, "libpjproject-...-Static.lib")
+        $combinedName = "libpjproject-i386-Win32-vc14-Release-Static.lib"
+        $vc = (Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\MSVC\*\bin\Hostx86\x86\lib.exe" -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+        Write-Host "lib.exe: $vc"
+        $outLib = Join-Path (Resolve-Path "lib").Path $combinedName
+        $inLibs = Get-ChildItem "lib\*.lib" | Where-Object { $_.Name -ne $combinedName } | ForEach-Object { $_.FullName }
+        Write-Host "Merging $($inLibs.Count) libs -> $combinedName"
+        & $vc /NOLOGO /IGNORE:4006 "/OUT:$outLib" @inLibs
+        if (Test-Path $outLib) {
+            Write-Host "Combined lib OK: $([math]::Round((Get-Item $outLib).Length/1MB,1)) MB"
+        } else {
+            Write-Host "ERROR: combined lib was not created"; exit 1
         }
 
         Write-Host "Libraries in lib/:"
