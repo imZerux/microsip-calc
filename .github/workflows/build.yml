@@ -114,10 +114,12 @@ jobs:
           '',
           '#define PJ_CONFIG_MICROSIP 1',
           '',
-          '/* Video support OFF (external ffmpeg/vpx/sdl not available in CI) */',
-          '#define PJMEDIA_HAS_VIDEO 0',
+          '/* Video subsystem ON so pjsua_vid_* symbols exist (MicroSIP references them),',
+          '   but NO external video codecs (ffmpeg/vpx) and NO SDL device -> no external libs */',
+          '#define PJMEDIA_HAS_VIDEO 1',
           '#define PJMEDIA_HAS_FFMPEG 0',
           '#define PJMEDIA_HAS_VPX 0',
+          '#define PJMEDIA_VIDEO_DEV_HAS_SDL 0',
           '',
           '/* Audio codecs: only those bundled with pjproject (external opus/silk/g729 OFF) */',
           '#define PJMEDIA_HAS_OPUS 0',
@@ -156,10 +158,11 @@ jobs:
         # WITHOUT building the sample apps that could otherwise fail the build.
         $sln = Get-ChildItem -Filter "pjproject-vs14.sln" | Select-Object -First 1
         if (-not $sln) { $sln = Get-ChildItem -Filter "*.sln" | Select-Object -First 1 }
-        Write-Host "Building whole solution: $($sln.Name)"
+        Write-Host "Building whole solution: $($sln.Name) [Release-Static /MT]"
+        # Release-Static => static CRT (/MT) to match MicroSIP, and libs named ...-Release-Static.lib.
         # Build every project. Sample apps (pjsua/pjsystest/pjsua2) may fail on v143 —
         # we ignore msbuild's exit code here and verify the LIBRARIES afterwards.
-        & $msbuild $sln.FullName /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /m /nr:false
+        & $msbuild $sln.FullName /p:Configuration=Release-Static /p:Platform=Win32 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /m /nr:false
         Write-Host "Solution build finished (exit $LASTEXITCODE) - verifying libraries next"
 
         $core = Get-ChildItem -Path "." -Recurse -Filter "pjsua-lib-*.lib" -ErrorAction SilentlyContinue | Select-Object -First 1
