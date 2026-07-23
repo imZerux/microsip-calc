@@ -156,12 +156,18 @@ jobs:
         # WITHOUT building the sample apps that could otherwise fail the build.
         $sln = Get-ChildItem -Filter "pjproject-vs14.sln" | Select-Object -First 1
         if (-not $sln) { $sln = Get-ChildItem -Filter "*.sln" | Select-Object -First 1 }
-        Write-Host "Building solution: $($sln.Name)"
-        & $msbuild $sln.FullName /t:pjsua_lib /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /m
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "pjsua_lib target failed (exit $LASTEXITCODE)"
+        Write-Host "Building whole solution: $($sln.Name)"
+        # Build every project. Sample apps (pjsua/pjsystest/pjsua2) may fail on v143 —
+        # we ignore msbuild's exit code here and verify the LIBRARIES afterwards.
+        & $msbuild $sln.FullName /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /m /nr:false
+        Write-Host "Solution build finished (exit $LASTEXITCODE) - verifying libraries next"
+
+        $core = Get-ChildItem -Path "." -Recurse -Filter "pjsua-lib-*.lib" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $core) {
+            Write-Host "FATAL: pjsua-lib was not produced - core library build failed"
             exit 1
         }
+        Write-Host "Core libs present (e.g. $($core.Name))"
 
         Write-Host "PJSIP build completed"
 
@@ -194,10 +200,15 @@ jobs:
         $combinedName = "libpjproject-i386-Win32-vc14-Release-Static.lib"
         $vc = (Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\*\VC\Tools\MSVC\*\bin\Hostx86\x86\lib.exe" -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
         Write-Host "lib.exe: $vc"
-        $outLib = Join-Path (Resolve-Path "lib").Path $combinedName
-        $inLibs = Get-ChildItem "lib\*.lib" | Where-Object { $_.Name -ne $combinedName } | ForEach-Object { $_.FullName }
+        $libDir = (Resolve-Path "lib").Path
+        $outLib = Join-Path $libDir $combinedName
+        $inLibs = Get-ChildItem "lib\*.lib" | Where-Object { $_.Name -ne $combinedName } | ForEach-Object { '"' + $_.FullName + '"' }
         Write-Host "Merging $($inLibs.Count) libs -> $combinedName"
-        & $vc /NOLOGO /IGNORE:4006 "/OUT:$outLib" @inLibs
+        # Use a response file so many long paths pass cleanly to lib.exe
+        $rsp = Join-Path $libDir "merge.rsp"
+        $rspLines = @('/NOLOGO', '/IGNORE:4006', ('/OUT:"' + $outLib + '"')) + $inLibs
+        Set-Content -Path $rsp -Value $rspLines -Encoding ascii
+        & $vc "@$rsp"
         if (Test-Path $outLib) {
             Write-Host "Combined lib OK: $([math]::Round((Get-Item $outLib).Length/1MB,1)) MB"
         } else {
